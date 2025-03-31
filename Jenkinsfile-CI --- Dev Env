@@ -136,7 +136,7 @@ pipeline {
         
         stage('Checkout from Git') {                        
             steps {                                       
-                git branch: 'main', url: 'https://github.com/yash509/DevSecOps-Bmicalculator-WebApp-Deployment.git'
+                git branch: 'main', url: 'https://github.com/yash509/DevSecOps-Bike-Store-WebApp-Deployment.git'
             }
         }
         
@@ -275,7 +275,7 @@ pipeline {
                 script{
                     //dir('Band Website') {
                         withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                            sh "docker build -t bmical ." 
+                            sh "docker build -t bike-store ." 
                             
                         //}
                     }
@@ -288,7 +288,7 @@ pipeline {
                 script{
                     //dir('Band Website') {
                         withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){
-                            sh "docker tag bmical yash5090/bmical:latest " 
+                            sh "docker tag bike-store yash5090/bike-store:latest " 
                         //}
                     }
                 }
@@ -297,7 +297,7 @@ pipeline {
         
         stage('Docker Image Scanning') { 
             steps { 
-                sh "trivy image --format table -o trivy-image-report.html yash5090/bmical:latest" 
+                sh "trivy image --format table -o trivy-image-report.html yash5090/bike-store:latest" 
             } 
         } 
         
@@ -306,7 +306,7 @@ pipeline {
                 script{
                     //dir('Band Website') {
                         withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
-                            sh "docker push yash5090/bmical:latest "
+                            sh "docker push yash5090/bike-store:latest "
                         //}
                     }
                 }
@@ -326,10 +326,10 @@ pipeline {
             steps {
                 script{
                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){
-                       sh 'docker-scout quickview yash5090/bmical:latest'
-                       sh 'docker-scout cves yash5090/bmical:latest'
-                       sh 'docker-scout recommendations yash5090/bmical:latest'
-                       sh 'docker-scout attestation yash5090/bmical:latest'
+                       sh 'docker-scout quickview yash5090/bike-store:latest'
+                       sh 'docker-scout cves yash5090/bike-store:latest'
+                       sh 'docker-scout recommendations yash5090/bike-store:latest'
+                       sh 'docker-scout attestation yash5090/bike-store:latest'
                    }
                 }   
             }
@@ -339,8 +339,8 @@ pipeline {
 		steps {
                 withCredentials([string(credentialsId: 'snyk', variable: 'snyk')]) {
                    sh 'snyk auth $snyk'
-                   sh 'snyk container test yash5090/bmical:latest > snyk-containertest-vulnerabilityreport.txt --report || true '
-                   sh 'snyk container monitor yash5090/bmical:latest > snyk-containermonitor-vulnerabilityreport.txt || true'
+                   sh 'snyk container test yash5090/bike-store:latest > snyk-containertest-vulnerabilityreport.txt --report || true '
+                   sh 'snyk container monitor yash5090/bike-store:latest > snyk-containermonitor-vulnerabilityreport.txt || true'
                 }
             }
         }    
@@ -348,15 +348,15 @@ pipeline {
         stage("TRIVY"){
             steps{
                 //dir('Band Website') {
-                    sh "trivy image yash5090/bmical:latest > trivyimage.txt"   
+                    sh "trivy image yash5090/bike-store:latest > trivyimage.txt"   
                 //}
             }
         }
 		
 		stage("Anchore Grype Docker Image Vulnerability Scan"){
             steps{
-                sh "docker run --rm anchore/grype:v0.82.0 yash5090/bmical:latest"
-                sh "docker run --rm anchore/grype:v0.82.0 -o json yash5090/bmical:latest > grypescanreport.json"
+                sh "docker run --rm anchore/grype:v0.82.0 yash5090/bike-store:latest"
+                sh "docker run --rm anchore/grype:v0.82.0 -o json yash5090/bike-store:latest > grypescanreport.json"
             }
         }
         
@@ -364,7 +364,7 @@ pipeline {
             steps {
                 script{
                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){
-                      sh 'docker-scout sbom --format list yash5090/bmical:latest' // docker-scout sbom yash5090/bmical:latest
+                      sh 'docker-scout sbom --format list yash5090/bike-store:latest' // docker-scout sbom yash5090/bike-store:latest
                     }
                 }   
             }
@@ -398,15 +398,15 @@ pipeline {
 
         stage ("Remove Docker Container") {
             steps{
-                sh "docker stop bmical | true"
-                sh "docker rm bmical | true"
+                sh "docker stop bike-store | true"
+                sh "docker rm bike-store | true"
              }
         }
         
         stage('Deploy to Docker Container'){
             steps{
                 //dir('BMI Calculator (JS)') {
-                    sh 'docker run -d --name bmical -p 5000:80 yash5090/bmical:latest' 
+                    sh 'docker run -d --name bike-store -p 3000:3000 yash5090/bike-store:latest' 
                 //}
             }
         }
