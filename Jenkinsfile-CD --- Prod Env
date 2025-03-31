@@ -1,0 +1,139 @@
+pipeline {
+    agent any
+    tools {
+        jdk 'jdk17'
+        nodejs 'node16'
+    }
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
+    stages {
+        stage('Checkout from Git') {                        
+            steps {                                       
+                git branch: 'main', url: 'https://github.com/yash509/DevSecOps-BIndicator-Deployment.git'
+            }
+        }
+		
+		stage ('Snyk Kubernetes-Config Files Vulnerablity Scan') {
+            steps {
+			    withCredentials([string(credentialsId: 'snyk', variable: 'snyk')]) {
+                sh 'snyk auth $snyk'
+                sh 'snyk iac test deployment.yaml --report > Deployment-filevulnerabilityreport.txt || true'
+                sh 'snyk iac test service.yaml --report > Service-filevulnerabilityreport.txt || true'
+				sh 'snyk iac test nwp.yaml --report > NetworkPolicy-filevulnerabilityreport.txt || true'
+			    }
+            }
+        }
+        
+        stage("Sanity Check") {
+            steps {
+                input "Should we ship to prod?"
+            }
+        }
+        
+        stage('Deploy to Kubernetes'){
+            steps{
+                script{
+                    //dir('K8S') {
+                        withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
+                                sh 'kubectl apply -f deployment.yaml'
+                                sh 'kubectl apply -f service.yaml'
+                                sh 'kubectl apply -f job.yaml'
+                                sh 'kubectl apply -f pv.yaml'
+                                sh 'kubectl apply -f pvc.yaml'
+                                sh 'kubectl apply -f nwp.yaml'
+                                sh 'kubectl apply -f ingress.yaml'
+                        //}
+                    }
+                }
+            }
+        }
+        
+         stage('Verify the Kubernetes Deployments') { 
+            steps { 
+                withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') { 
+                    sh "kubectl get all "
+                    sh "kubectl get pods " 
+                    sh "kubectl get svc "
+                    sh "kubectl get ns"
+                } 
+            } 
+        } 
+        stage('Deployment Done') {
+            steps {
+                echo 'Deployed Succcessfully...'
+            }
+        }
+    }
+    
+    post { 
+        always {
+            script { 
+                def jobName = env.JOB_NAME 
+                def buildNumber = env.BUILD_NUMBER 
+                def pipelineStatus = currentBuild.result ?: 'UNKNOWN' 
+                def bannerColor = pipelineStatus.toUpperCase() == 'SUCCESS' ? 'green' : 'red' 
+                def body = """ 
+                <html> 
+                <body> 
+                <div style="border: 4px solid ${bannerColor}; padding: 10px;"> 
+                <h2>${jobName} - Build ${buildNumber}</h2> 
+                <div style="background-color: ${bannerColor}; padding: 10px;"> 
+                <h3 style="color: white;">Pipeline Status: ${pipelineStatus.toUpperCase()}</h3> 
+                </div> 
+                <p>Check the <a href="${BUILD_URL}">console output</a>.</p> 
+                </div> 
+                </body> 
+                </html> 
+            """ 
+ 
+            emailext (
+                attachLog: true,
+                subject: "${jobName} - Build ${buildNumber} - ${pipelineStatus.toUpperCase()}", 
+                body: body, 
+                to: 'clouddevopshunter@gmail.com', 
+                from: 'jenkins@example.com', 
+                replyTo: 'jenkins@example.com', 
+                mimeType: 'text/html', 
+                attachmentsPattern: 'Deployment-filevulnerabilityreport.txt, Service-filevulnerabilityreport.txt, NetworkPolicy-filevulnerabilityreport.txt')
+
+				def buildDuration = currentBuild.durationString.replace(' and counting', '')
+                def changes = currentBuild.changeSets.collect { changeSet ->
+                    changeSet.items.collect { entry ->
+                        "*${entry.author}:* ${entry.msg} (${entry.commitId})"
+                    }.join('\n')
+                }.join('\n')
+
+                def buildUser = env.BUILD_USER ?: 'N/A'
+                def buildUserEmail = env.BUILD_USER_EMAIL ?: 'N/A'
+
+                slackSend(
+                    channel: '#cloud_devsecops_engineer',
+                    color: currentBuild.currentResult == 'SUCCESS' ? 'good' : 'danger',
+                    message: """
+                    *${currentBuild.currentResult}:* Job ${env.JOB_NAME} (${env.BUILD_NUMBER})
+                    *Duration:* ${buildDuration}
+                    *Started by:* ${currentBuild.getBuildCauses()[0].shortDescription}
+                    *User Email:* ${env.BUILD_USER_EMAIL}
+                    *Changes:*
+                    ${changes}
+                    *Workspace:* ${env.WORKSPACE}
+                    *Node:* ${env.NODE_NAME}
+                    *Jenkins URL:* ${env.JENKINS_URL}
+                    *Executor Number:* ${env.EXECUTOR_NUMBER}
+                    *Job URL:* ${env.JOB_URL}
+                    *Build URL:* ${env.BUILD_URL}
+                    *Build Timestamp:* ${new Date(currentBuild.startTimeInMillis).format("yyyy-MM-dd HH:mm:ss")}
+                    *Build Parameters:* ${params}
+                    *Build ID:* ${env.BUILD_ID}
+                    *Build Tag:* ${env.BUILD_TAG}
+                    *Build Display Name:* ${currentBuild.displayName}
+                    *Build Executor:* ${env.EXECUTOR_NUMBER}
+                    *Slave/Node Name:* ${env.NODE_NAME}
+                    *Node Labels:* ${env.NODE_LABELS}
+                    """
+                )
+            } 
+        } 
+    }
+}
