@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pe-wa-pv
+  name: bike-store-pv
 spec:
   capacity:
     storage: 5Gi
