@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: countrybank-green
+  name: bike-store-green
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
-      app: countrybank
+      app: bike-store
       version: green
   template:
     metadata:
       labels:
-        app: countrybank
+        app: bike-store
         version: green
     spec:
       containers:
-      - name: countrybank
-        image: yash5090/countrybank:green # Adjust the image tag for the green version
+      - name: bike-store
+        image: yash5090/bike-store:green # Adjust the image tag for the green version
         ports:
         - containerPort: 3000
         # env:
         # - name: SPRING_DATASOURCE_URL
-        #   value: jdbc:mysql://mysql-service:3306/countrybankdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+        #   value: jdbc:mysql://mysql-service:3306/bike-storedb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
         # - name: SPRING_DATASOURCE_USERNAME
         #   value: root
         # - name: SPRING_DATASOURCE_PASSWORD
